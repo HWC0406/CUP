@@ -1,0 +1,118 @@
+---
+title: "CUP Abundances"
+author: "A.DeMartin"
+date: "2025-03-17"
+output: 
+  html_document:
+    keep_md: true
+    toc: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(width = 100)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, dev = c("png", "pdf"))
+seed <- 1234
+```
+
+## load packages
+```{r load packages, warning=FALSE, include=FALSE}
+library(ExploreSCdataSeurat3)
+library(runSeurat3)
+library(Seurat)
+library(ggpubr)
+library(pheatmap)
+library(SingleCellExperiment)
+library(dplyr)
+library(tidyverse)
+library(viridis)
+library(muscat)
+library(circlize)
+library(destiny)
+library(scater)
+library(metap)
+library(multtest)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(enrichplot)
+library(DOSE)
+library(grid)
+library(gridExtra)
+library(ggupset)
+library(VennDiagram)
+library(NCmisc)
+```
+
+## load file
+```{r load merged file}
+##load merged file 
+fileNam <- "/Users/immbio/Desktop/Project/Angelina/CUP/data/CD45neg_allmerged_seurat.rds"
+seuratM <- readRDS(fileNam)
+table(seuratM$dataset)
+table(seuratM$RNA_snn_res.0.25)
+table(seuratM$orig.ident)
+```
+
+##set color vectors 
+```{r set color vector}
+coldiseaseCond <- c("#202547","#B45B5C")
+names(coldiseaseCond) <- c("healthy", "CUP")
+```
+
+```{r abundance diseaseCond, fig.height=8, fig.width=10}
+###diseaseCond
+datList <- NULL
+for(con in unique(seuratM$diseaseCond)){
+  seuratSub <- subset(seuratM, diseaseCond==con)
+  print(dim(seuratSub))
+  dat_con <- as.data.frame(table(seuratSub$RNA_snn_res.0.25)) %>%
+  mutate(percent=Freq/ncol(seuratSub)) %>% mutate(diseaseCond=con)
+  datList[[con]] <- dat_con
+}
+dat_all <- do.call("rbind", datList)
+
+orddiseaseCond <- c("healthy", "CUP")
+## plot abundance
+ggbarplot(dat_all, x= "diseaseCond", y= "percent", fill = "Var1", legend = "right", legend.titel = "cluster", ylab = "frequency")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_x_discrete(limits=orddiseaseCond)
+```
+
+```{r abundance dataset, fig.height=8, fig.width=10}
+###dataset
+datList <- NULL
+for(con in unique(seuratM$dataset)){
+  seuratSub <- subset(seuratM, dataset==con)
+  print(dim(seuratSub))
+  dat_con <- as.data.frame(table(seuratSub$RNA_snn_res.0.25)) %>%
+  mutate(percent=Freq/ncol(seuratSub)) %>% mutate(dataset=con)
+  datList[[con]] <- dat_con
+}
+dat_all <- do.call("rbind", datList)
+
+## plot abundance
+ggbarplot(dat_all, x= "dataset", y= "percent", fill = "Var1", legend = "right", legend.titel = "cluster", ylab = "frequency")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+```
+
+```{r abundance patient, fig.height=8, fig.width=10}
+###patient
+datList <- NULL
+for(con in unique(seuratM$patient)){
+  seuratSub <- subset(seuratM, patient==con)
+  print(dim(seuratSub))
+  dat_con <- as.data.frame(table(seuratSub$RNA_snn_res.0.25)) %>%
+  mutate(percent=Freq/ncol(seuratSub)) %>% mutate(patient=con)
+  datList[[con]] <- dat_con
+}
+dat_all <- do.call("rbind", datList)
+
+ordpatients <- c("hLN_01","hLN-02", "hLN_03","hLN_04", "hLN_05","CUP_01", "CUP_03", "CUP_04","CUP_05")
+## plot abundance
+ggbarplot(dat_all, x= "patient", y= "percent", fill = "Var1", legend = "right", legend.titel = "cluster", ylab = "frequency")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_x_discrete(limits=ordpatients)
+```
+
+## session info
+```{r date and session info}
+date()
+sessionInfo()
+```

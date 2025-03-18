@@ -1,0 +1,124 @@
+---
+title: "CUP Umaps"
+author: "A.DeMartin"
+date: "2025-03-17"
+output: 
+  html_document:
+    keep_md: true
+    toc: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(width = 100)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, dev = c("png", "pdf"))
+seed <- 1234
+```
+
+## load packages
+```{r load packages, warning=FALSE, include=FALSE}
+library(ExploreSCdataSeurat3)
+library(runSeurat3)
+library(Seurat)
+library(ggpubr)
+library(pheatmap)
+library(SingleCellExperiment)
+library(dplyr)
+library(tidyverse)
+library(viridis)
+library(muscat)
+library(circlize)
+library(destiny)
+library(scater)
+library(metap)
+library(multtest)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(enrichplot)
+library(DOSE)
+library(grid)
+library(gridExtra)
+library(ggupset)
+library(VennDiagram)
+library(NCmisc)
+```
+
+## load file
+```{r load merged file}
+##load merged file 
+fileNam <- "/Users/immbio/Desktop/Project/Angelina/CUP/data/CD45neg_allmerged_seurat.rds"
+seuratM <- readRDS(fileNam)
+table(seuratM$dataset)
+table(seuratM$RNA_snn_res.0.25)
+table(seuratM$orig.ident)
+```
+
+##set color vectors 
+```{r set color vector}
+coldiseaseCond <- c("#202547","#B45B5C")
+names(coldiseaseCond) <- c("healthy", "CUP")
+```
+
+## plot umaps
+```{r umap}
+Idents(seuratM) <- seuratM$RNA_snn_res.0.25
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1) 
+
+Idents(seuratM) <- seuratM$patient
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, shuffle = TRUE) 
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, split.by = "patient")
+
+Idents(seuratM) <- seuratM$diseaseCond
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, cols = coldiseaseCond, shuffle = TRUE) 
+
+Idents(seuratM) <- seuratM$diseaseCond
+coldiseaseCond <- c("#202547","lightgrey")
+names(coldiseaseCond) <- c("healthy", "CUP")
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, cols = coldiseaseCond, order = "healthy") 
+
+Idents(seuratM) <- seuratM$diseaseCond
+coldiseaseCond <- c("lightgrey", "#B45B5C")
+names(coldiseaseCond) <- c("healthy", "CUP")
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, cols = coldiseaseCond, order = "healthy") 
+
+coldiseaseCond <- c("#202547","#B45B5C")
+names(coldiseaseCond) <- c("healthy", "CUP")
+```
+
+## calculate cluster marker genes
+```{r marker genes, include=TRUE, eval=FALSE}
+##cluster marker
+Idents(seuratM) <- seuratM$RNA_snn_res.0.25
+markerGenes <- FindAllMarkers(seuratM, only.pos=T) %>% 
+  dplyr::filter(p_val_adj < 0.01)
+#save table
+write.table(markerGenes, 
+            file= "/Users/immbio/Desktop/Project/Angelina/CUP/analysis/markerGenesRNA_snn_res.0.25",
+            sep="\t",
+            quote=F,
+            row.names=F,
+            col.names=T)
+```
+
+## plot features cluster marker 
+```{r feature plot marker genes}
+##Immun
+FeaturePlot(seuratM, features = "ENSG00000081237.PTPRC", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+##Endo
+FeaturePlot(seuratM, features = "ENSG00000261371.PECAM1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000117707.PROX1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+##Fibroblastic
+FeaturePlot(seuratM, features = "ENSG00000163359.COL6A3", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000107796.ACTA2", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+##Tumor
+FeaturePlot(seuratM, features = "ENSG00000205420.KRT6A", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000119888.EPCAM", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+```
+
+## session info
+```{r date and session info}
+date()
+sessionInfo()
+```

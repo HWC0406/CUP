@@ -1,0 +1,262 @@
+---
+title: "CUP merge_QC"
+author: "A.DeMartin"
+date: "2025-03-17"
+output: 
+  html_document:
+    keep_md: true
+    toc: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(width = 100)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, dev = c("png", "pdf"))
+seed <- 1234
+```
+
+## load packages
+```{r load packages, warning=FALSE, include=FALSE}
+library(ExploreSCdataSeurat3)
+library(runSeurat3)
+library(Seurat)
+library(ggpubr)
+library(pheatmap)
+library(SingleCellExperiment)
+library(dplyr)
+library(tidyverse)
+library(viridis)
+library(muscat)
+library(circlize)
+library(destiny)
+library(scater)
+library(metap)
+library(multtest)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(enrichplot)
+library(DOSE)
+library(grid)
+library(gridExtra)
+library(ggupset)
+library(VennDiagram)
+library(NCmisc)
+```
+
+##############################start pre-processing##############################
+
+## load files and merge
+```{r load files, eval=FALSE, include=TRUE}
+### load and merge all 
+basedir <- "/Users/immbio/Desktop/Project/Angelina/CUP/data/seurat_objects/"
+fileNamList <- list.files(path = basedir)
+
+for(i in 1:length(fileNamList)){
+  seuratS <- readRDS(paste0(basedir, fileNamList[i]))
+  if(exists("seuratM")){
+    seuratM <- merge(x = seuratM, y = seuratS)
+    cat("Merged", i, "of", length(fileNamList), "files - Total cells:", ncol(seuratM), "\n")
+  }else{
+    seuratM <- seuratS
+    cat("Initialized with first Seurat object:", fileNamList[i], "\n")
+  }
+}
+
+remove(seuratS)
+table(seuratM$dataset)
+table(seuratM$orig.ident)
+
+##join layers
+seuratM <- JoinLayers(seuratM)
+
+##rerun seurat
+seuratM <- NormalizeData (object = seuratM)
+seuratM <- FindVariableFeatures(object = seuratM)
+seuratM <- ScaleData(object = seuratM, verbose = TRUE)
+seuratM <- RunPCA(object=seuratM, npcs = 30, verbose = FALSE)
+seuratM <- RunTSNE(object=seuratM, reduction="pca", dims = 1:20)
+seuratM <- RunUMAP(object=seuratM, reduction="pca", dims = 1:20)
+seuratM <- FindNeighbors(object = seuratM, reduction = "pca", dims= 1:20)
+
+res <- c(0.25, 0.6, 0.8, 0.4)
+for (i in 1:length(res)) {
+  seuratM <- FindClusters(object = seuratM, resolution = res[i], random.seed = 1234)
+}
+```
+
+```{r save merged seurat object, eval=FALSE, include=TRUE}
+### save seurat object
+saveRDS(seuratM, file="/Users/immbio/Desktop/Project/Angelina/CUP/data/CD45neg_allmerged_seurat.rds")
+```
+
+##############################end pre-processing##############################
+
+## load file
+```{r load merged file}
+##load merged file 
+fileNam <- "/Users/immbio/Desktop/Project/Angelina/CUP/data/CD45neg_allmerged_seurat.rds"
+seuratM <- readRDS(fileNam)
+table(seuratM$dataset)
+table(seuratM$RNA_snn_res.0.25)
+table(seuratM$orig.ident)
+```
+
+```{r add metadata}
+### add any type of metadata
+### patient
+CUP_01 <- c("373291_01-1_20241211_Hu_CUP_01_CD45neg")
+CUP_03 <- c("373291_07-7_20241211_Hu_CUP_03_CD45neg")
+CUP_04 <- c("373291_03-3_20241211_Hu_CUP_04_CD45neg")
+CUP_05 <- c("373291_05-5_20241211_Hu_CUP_05_CD45neg")
+hLN_01 <- c("13_20200723_Hu_LN_Lin_neg_FSC_v3")
+hLN_02 <- c("1_20200909_Human__LN_FSC1_v3","2_20200909_Human__LN_FSC2_v3")
+hLN_03 <- c("1_20210113_Human_LN_FSC1_v3","2_20210113_Human_LN_FSC2_v3")
+hLN_04 <- c("o27533_1_01-1_20220201_Hu_LN_stroma_v3")
+hLN_05 <- c("o27533_1_05-5_20220202_Hu_LN_stroma_v3")
+
+seuratM$patient <- "pat_nr"
+seuratM$patient[which(seuratM$dataset %in% CUP_01)] <- "CUP_01"
+seuratM$patient[which(seuratM$dataset %in% CUP_03)] <- "CUP_03"
+seuratM$patient[which(seuratM$dataset %in% CUP_04)] <- "CUP_04"
+seuratM$patient[which(seuratM$dataset %in% CUP_05)] <- "CUP_05"
+seuratM$patient[which(seuratM$dataset %in% hLN_01)] <- "hLN_01"
+seuratM$patient[which(seuratM$dataset %in% hLN_02)] <- "hLN-02"
+seuratM$patient[which(seuratM$dataset %in% hLN_03)] <- "hLN_03"
+seuratM$patient[which(seuratM$dataset %in% hLN_04)] <- "hLN_04"
+seuratM$patient[which(seuratM$dataset %in% hLN_05)] <- "hLN_05"
+table(seuratM$patient)
+
+###order patients
+ordpatients <- c("hLN_01","hLN-02", "hLN_03","hLN_04", "hLN_05","CUP_01", "CUP_03", "CUP_04","CUP_05")
+seuratM$patient <- factor(seuratM$patient, levels=c("hLN_01","hLN-02", "hLN_03","hLN_04", "hLN_05","CUP_01", "CUP_03", "CUP_04","CUP_05"))
+Idents(seuratM) <- seuratM$patient
+table(seuratM$patient)
+
+
+#### diseaseCond
+seuratM$diseaseCond <- "diseaseCond"
+seuratM$diseaseCond[grepl("CUP", seuratM$dataset)] <- "CUP"
+seuratM$diseaseCond[grepl("LN", seuratM$dataset)] <- "healthy"
+table(seuratM$diseaseCond)
+
+###order
+orddiseaseCond <- c("healthy", "CUP")
+seuratM$diseaseCond <- factor(seuratM$diseaseCond, levels=c("healthy", "CUP"))
+Idents(seuratM) <- seuratM$diseaseCond
+table(seuratM$diseaseCond)
+
+###combined slots
+###patients and clusterName
+#seuratM$patient_clusterName <- paste0(seuratM$patient, '_', seuratM$clusterName)
+#table(seuratM$patient_clusterName)
+###diseaseCond and clusterName
+#seuratM$diseaseCond_clusterName <- paste0(seuratM$diseaseCond, '_', seuratM$clusterName)
+#table(seuratM$diseaseCond_clusterName)
+```
+
+##set color vectors 
+```{r set color vector}
+coldiseaseCond <- c("#202547","#B45B5C")
+names(coldiseaseCond) <- c("healthy", "CUP")
+```
+
+```{r QC dataset, fig.height=20, fig.width=40}
+# Extract meta.data from the Seurat object
+meta.data <- seuratM@meta.data
+# Create the density plot
+ptotal <- ggplot(data = meta.data, aes(x = total, color = dataset, fill = dataset)) +
+  geom_density(alpha = 0.2) +
+  #scale_fill_manual(values = colpat) +
+  #scale_color_manual(values = colpat) +
+  theme_classic() +
+  scale_x_log10() +
+  ylab("density") +
+  geom_vline(xintercept = 100) +
+  theme(legend.text = element_text(size = 30), legend.title = element_text(size = 40))
+
+
+pdetected <- ggplot(data = meta.data, aes(x = detected, color = dataset, fill = dataset)) +
+  geom_density(alpha = 0.2) +
+ #scale_fill_manual(values = colpat) +
+  #scale_color_manual(values = colpat) +
+  theme_classic() +
+  scale_x_log10() +
+  ylab("density") +
+  geom_vline(xintercept = 100) +
+  theme(legend.text = element_text(size = 30), legend.title = element_text(size = 40))
+
+# Return the plots as a list
+list(ptotal, pdetected)
+```
+
+```{r QC patient, fig.height=20, fig.width=40}
+# Extract meta.data from the Seurat object
+meta.data <- seuratM@meta.data
+# Create the density plot
+ptotal <- ggplot(data = meta.data, aes(x = total, color = patient, fill = patient)) +
+  geom_density(alpha = 0.2) +
+  #scale_fill_manual(values = colpat) +
+  #scale_color_manual(values = colpat) +
+  theme_classic() +
+  scale_x_log10() +
+  ylab("density") +
+  geom_vline(xintercept = 100) +
+  theme(legend.text = element_text(size = 30), legend.title = element_text(size = 40))
+
+
+pdetected <- ggplot(data = meta.data, aes(x = detected, color = patient, fill = patient)) +
+  geom_density(alpha = 0.2) +
+ #scale_fill_manual(values = colpat) +
+  #scale_color_manual(values = colpat) +
+  theme_classic() +
+  scale_x_log10() +
+  ylab("density") +
+  geom_vline(xintercept = 100) +
+  theme(legend.text = element_text(size = 30), legend.title = element_text(size = 40))
+
+# Return the plots as a list
+list(ptotal, pdetected)
+```
+
+## plot cell numbers dataset
+```{r cellnumber circle dataset, fig.height=20, fig.width=40}
+table(seuratM$dataset)
+cell_count <- data.frame(table(seuratM$dataset))
+colnames(cell_count) <- c("dataset", "Freq")
+hsize <- 1.5
+
+ggplot(cell_count, aes(x = hsize, y = Freq, fill = dataset)) +
+  #scale_fill_manual(values = colpat2) +
+  geom_col(color = "white") +
+  coord_polar(theta = "y") +
+  xlim(c(0.2, hsize + 0.5)) +
+  theme_void() +
+  ggtitle("cell number") +
+  theme(plot.title = element_text(hjust = 0.5, size = 40), legend.text = element_text(size = 30), legend.title = element_text(size = 40)) +
+  geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 10)
+```
+## plot cell numbers patients
+```{r cellnumber circle patients, fig.height=20, fig.width=40}
+table(seuratM$patient)
+cell_count <- data.frame(table(seuratM$patient))
+colnames(cell_count) <- c("patient", "Freq")
+hsize <- 1.5
+
+ggplot(cell_count, aes(x = hsize, y = Freq, fill = patient)) +
+  #scale_fill_manual(values = colpat2) +
+  geom_col(color = "white") +
+  coord_polar(theta = "y") +
+  xlim(c(0.2, hsize + 0.5)) +
+  theme_void() +
+  ggtitle("cell number") +
+  theme(plot.title = element_text(hjust = 0.5, size = 40), legend.text = element_text(size = 30), legend.title = element_text(size = 40)) +
+  geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 10)
+```
+
+## session info
+```{r date and session info}
+date()
+sessionInfo()
+```

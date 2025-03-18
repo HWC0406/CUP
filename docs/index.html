@@ -281,7 +281,7 @@ $(document).ready(function () {
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
 <span class="glyphicon glyphicon-list" aria-hidden="true"></span>
-workflowr <span class="glyphicon glyphicon-ok text-success"
+workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger"
 aria-hidden="true"></span>
 </button>
 </p>
@@ -292,8 +292,8 @@ aria-hidden="true"></span>
 </li>
 <li>
 <a data-toggle="tab" href="#checks"> Checks <span
-class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
-</a>
+class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> </a>
 </li>
 <li>
 <a data-toggle="tab" href="#versions">Past versions</a>
@@ -306,9 +306,9 @@ class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
 </p>
 <p>
 <strong>Checks:</strong> <span
-class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 2
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 1
 <span class="glyphicon glyphicon-exclamation-sign text-danger"
-aria-hidden="true"></span> 0
+aria-hidden="true"></span> 1
 </p>
 <p>
 <strong>Knit directory:</strong> <code>CUP/</code> <span
@@ -331,31 +331,36 @@ versions</em> tab lists the development history.
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
-<span class="glyphicon glyphicon-ok text-success"
-aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
-</a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges">
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted
+changes </a>
 </p>
 </div>
-<div id="strongRMarkdownfilestronguptodate"
+<div id="strongRMarkdownfilestronguncommittedchanges"
 class="panel-collapse collapse">
 <div class="panel-body">
-<p>Great! Since the R Markdown file has been committed to the Git
-repository, you know the exact version of the code that produced these
-results.</p>
+<p>The R Markdown file has unstaged changes. To know which version of
+the R Markdown file created these results, you’ll want to first commit
+it to the Git repo. If you’re still working on the analysis, you can
+ignore this warning. When you’re finished, you can run
+<code>wflow_publish</code> to commit the R Markdown file and build the
+HTML.</p>
 </div>
 </div>
 </div>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong3dfa446">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomangeldemartinCUPtree61a6340d48a9df3c17843c5062f921b973378bb3targetblank61a6340a">
 <span class="glyphicon glyphicon-ok text-success"
-aria-hidden="true"></span> <strong>Repository version:</strong> 3dfa446
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/angeldemartin/CUP/tree/61a6340d48a9df3c17843c5062f921b973378bb3" target="_blank">61a6340</a>
 </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrong3dfa446"
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomangeldemartinCUPtree61a6340d48a9df3c17843c5062f921b973378bb3targetblank61a6340a"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -364,7 +369,8 @@ and connecting the code version to the results is critical for
 reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version 3dfa446.
+The results in this page were generated with repository version
+<a href="https://github.com/angeldemartin/CUP/tree/61a6340d48a9df3c17843c5062f921b973378bb3" target="_blank">61a6340</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -379,10 +385,17 @@ were generated:
 </p>
 <pre><code>
 Ignored files:
+    Ignored:    .DS_Store
     Ignored:    .Rproj.user/
+    Ignored:    data/seurat_objects/
+
+Untracked files:
+    Untracked:  analysis/CUP_Abundances.Rmd
+    Untracked:  analysis/CUP_Umaps_Marker.Rmd
+    Untracked:  analysis/CUP_merge_QC.Rmd
 
 Unstaged changes:
-    Modified:   CUP.Rproj
+    Modified:   analysis/index.Rmd
 
 </code></pre>
 <p>
@@ -428,10 +441,27 @@ Message
 <tbody>
 <tr>
 <td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/angeldemartin/CUP/2aa2db6fb07209f0620f26909bd1b97bb4d32217/docs/index.html" target="_blank">2aa2db6</a>
+</td>
+<td>
+angeldemartin
+</td>
+<td>
+2025-03-18
+</td>
+<td>
+initial
+</td>
+</tr>
+<tr>
+<td>
 Rmd
 </td>
 <td>
-3dfa446
+<a href="https://github.com/angeldemartin/CUP/blob/3dfa446dac71d6d0ac58518aea6c743aead55f47/analysis/index.Rmd" target="_blank">3dfa446</a>
 </td>
 <td>
 angeldemartin
@@ -450,7 +480,20 @@ Start workflowr project.
 </div>
 </div>
 </div>
-<p>Welcome to my research website.</p>
+<div id="merge_qc" class="section level2">
+<h2>Merge_QC</h2>
+<p>merge individual seurat object and run QC <a
+href="CUP_merge_QC.html">link</a></p>
+</div>
+<div id="umaps_marker" class="section level2">
+<h2>Umaps_Marker</h2>
+<p>plot umaps, calculate and plot cluster marker <a
+href="CUP_Umaps_Marker.html">link</a></p>
+</div>
+<div id="abundances" class="section level2">
+<h2>Abundances</h2>
+<p>plot relative abundances <a href="CUP_Abundances.html">link</a></p>
+</div>
 </div>
 </div>
 </div>

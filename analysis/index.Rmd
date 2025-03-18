@@ -8,4 +8,15 @@ editor_options:
   chunk_output_type: console
 ---
 
-Welcome to my research website.
+## Merge_QC
+merge individual seurat object and run QC
+[link](CUP_merge_QC.html)
+
+## Umaps_Marker
+plot umaps, calculate and plot cluster marker
+[link](CUP_Umaps_Marker.html)
+
+## Abundances
+plot relative abundances
+[link](CUP_Abundances.html)
+
