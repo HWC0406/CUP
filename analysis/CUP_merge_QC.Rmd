@@ -50,7 +50,7 @@ library(NCmisc)
 ## load files and merge
 ```{r load files, eval=FALSE, include=TRUE}
 ### load and merge all 
-basedir <- "/Users/immbio/Desktop/Project/Angelina/CUP/data/seurat_objects/"
+basedir <- "/R/CUP/data/seurat_objects/"
 fileNamList <- list.files(path = basedir)
 
 for(i in 1:length(fileNamList)){
@@ -88,7 +88,7 @@ for (i in 1:length(res)) {
 
 ```{r save merged seurat object, eval=FALSE, include=TRUE}
 ### save seurat object
-saveRDS(seuratM, file="/Users/immbio/Desktop/Project/Angelina/CUP/data/CD45neg_allmerged_seurat.rds")
+saveRDS(seuratM, file="/R/CUP/data/CD45neg_allmerged_seurat.rds")
 ```
 
 ##############################end pre-processing##############################
@@ -106,7 +106,7 @@ table(seuratM$orig.ident)
 ```{r add metadata}
 ### add any type of metadata
 ### patient
-CUP_01 <- c("373291_01-1_20241211_Hu_CUP_01_CD45neg")
+CUP_01 <- c("373291_01-1_20241211_Hu_CUP_01_CD45neg", "380131_01-1_20250224_Hu_CUP_01_stroma")
 CUP_03 <- c("373291_07-7_20241211_Hu_CUP_03_CD45neg")
 CUP_04 <- c("373291_03-3_20241211_Hu_CUP_04_CD45neg")
 CUP_05 <- c("373291_05-5_20241211_Hu_CUP_05_CD45neg")

@@ -1,0 +1,495 @@
+---
+title: "CUP_no tumor"
+output: html_document
+date: "2025-04-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## load packages
+```{r load packages, warning=FALSE, include=FALSE}
+library(ExploreSCdataSeurat3)
+library(runSeurat3)
+library(Seurat)
+library(ggpubr)
+library(pheatmap)
+library(SingleCellExperiment)
+library(dplyr)
+library(tidyverse)
+library(viridis)
+library(muscat)
+library(circlize)
+library(destiny)
+library(scater)
+library(metap)
+library(multtest)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(enrichplot)
+library(DOSE)
+library(grid)
+library(gridExtra)
+library(ggupset)
+library(VennDiagram)
+library(NCmisc)
+```
+
+
+
+```{r}
+
+seuratM_stroma_only <- subset(seuratM_stroma, colclusterName %in% c("Tu1", "Tu2", "Tu3"),invert = TRUE)
+
+##rerun seurat
+seuratM_stroma_only <- NormalizeData (object = seuratM_stroma_only)
+seuratM_stroma_only <- FindVariableFeatures(object = seuratM_stroma_only)
+seuratM_stroma_only <- ScaleData(object = seuratM_stroma_only, verbose = TRUE)
+seuratM_stroma_only <- RunPCA(object=seuratM_stroma_only, npcs = 30, verbose = FALSE)
+seuratM_stroma_only <- RunTSNE(object=seuratM_stroma_only, reduction="pca", dims = 1:20)
+seuratM_stroma_only <- RunUMAP(object=seuratM_stroma_only, reduction="pca", dims = 1:20)
+seuratM_stroma_only <- FindNeighbors(object = seuratM_stroma_only, reduction = "pca", dims= 1:20)
+
+res <- c(0.25, 0.6, 0.8, 0.4)
+for (i in 1:length(res)) {
+  seuratM_stroma_only <- FindClusters(object = seuratM_stroma_only, resolution = res[i], random.seed = 1234)
+}
+
+Idents(seuratM_stroma_only) <- seuratM_stroma_only$colclusterName
+DimPlot(seuratM_stroma_only, reduction = "umap", pt.size = 0.1) 
+
+Idents(seuratM_stroma_only) <- seuratM_stroma_only$patient
+DimPlot(seuratM_stroma_only, reduction = "umap", pt.size = 0.1, shuffle = TRUE) 
+
+Idents(seuratM_stroma_only) <- seuratM_stroma_only$diseaseCond
+coldiseaseCond <- c("#202547","lightgrey")
+names(coldiseaseCond) <- c("healthy", "CUP")
+DimPlot(seuratM_stroma_only, reduction = "umap", pt.size = 0.1, cols = coldiseaseCond, order = "healthy") 
+
+
+
+
+```
+
+
+## dotplot marker genes
+```{r dotplot marker genes, fig.height=6, fig.width=8}
+seuratM_stroma_only$colclusterName <- factor(seuratM_stroma_only$colclusterName, levels=c("PI16_FRC","FRC1","FRC2", "PRC","PRC_Tu","CAF1","BEC1","BEC2","LEC"))
+Idents(seuratM_stroma_only) <-seuratM_stroma_only$colclusterName
+
+genes <- data.frame(gene=rownames(seuratM_stroma_only)) %>% 
+  mutate(geneID=gsub("^.*\\.", "", gene))
+
+selGenes <- data.frame(geneID=rev(c( "COL1A2", "COL6A3", "PDGFRB", "DCN",  "FBN1", "C7", "CCL21","CCL19", "CXCL12", "PI16", "ACTA2", "ITGA7","RGS5", "NOTCH3", "MCAM","PDPN", "FAP","LRRC15","POSTN","PECAM1", "VWF", "EGFL7", "ITGA10", "PROX1"))) %>% left_join(., genes, by="geneID") %>% filter(gene != "ENSG00000232995.RGS5") 
+
+DotPlot(seuratM_stroma_only, features = selGenes, group.by= "colclusterName") + RotatedAxis() + scale_color_viridis(option="F") + coord_flip()
+
+
+```
+
+
+
+## rel abundance
+```{r rel abundance, fig.height= 8, fig.width= 8}
+###dataset
+datList <- NULL
+for(con in unique(seuratM_stroma_only$patient)){
+  seuratSub <- subset(seuratM_stroma_only, patient==con)
+  print(dim(seuratSub))
+  dat_con <- as.data.frame(table(seuratSub$colclusterName)) %>%
+  mutate(percent=Freq/ncol(seuratSub)) %>% mutate(patient=con)
+  datList[[con]] <- dat_con
+}
+dat_all <- do.call("rbind", datList)
+
+## plot abundance
+ggbarplot(dat_all, x= "patient", y= "percent", fill = "Var1",  legend = "right", legend.titel = "cluster", ylab = "frequency")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+###cond
+###patient_diseaseCond
+datList <- NULL
+for(con in unique(seuratM_stroma_only$diseaseCond)){
+  seuratSub <- subset(seuratM_stroma_only, diseaseCond==con)
+  print(dim(seuratSub))
+  dat_con <- as.data.frame(table(seuratSub$colclusterName)) %>%
+  mutate(percent=Freq/ncol(seuratSub)) %>% mutate(diseaseCond=con)
+  datList[[con]] <- dat_con
+}
+
+dat_all <- do.call("rbind", datList)
+
+
+## plot abundance
+ggbarplot(dat_all, x= "diseaseCond", y= "percent", fill = "Var1", palette = colclusterName, legend = "right", legend.titel = "cluster", ylab = "frequency")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+
+##ordpatient_diseasecond <- unique(seuratMfil$patient_diseaseCond)[order(
+ ## !grepl("healthy", unique(seuratMfil$patient_diseaseCond)),  # "HH" first (FALSE is sorted before TRUE)
+ ## !grepl("visit1", unique(seuratMfil$patient_diseaseCond)),  # "visit1" second
+ ## !grepl("visit2", unique(seuratMfil$patient_diseaseCond)),  # "visit2" third
+ ## !grepl("visit3", unique(seuratMfil$patient_diseaseCond)),  # "visit3" third
+ ## !grepl("visit4", unique(seuratMfil$patient_diseaseCond)),  # "visit4" third
+ ## !grepl("visit5", unique(seuratMfil$patient_diseaseCond)),  # "visit5" third
+ ## !grepl("visitX1", unique(seuratMfil$patient_diseaseCond)),  # "visitX1" third
+ ## !grepl("visitX2", unique(seuratMfil$patient_diseaseCond)),  # "visitX2" third
+ ##  !grepl("visitX3", unique(seuratMfil$patient_diseaseCond)),  # "visitX3" third
+ ## unique(seuratMfil$patient_diseaseCond)  # Alphabetical order within groups
+##)]
+
+
+
+
+```
+
+```{r}
+
+
+seuratM_Tu_only <- subset(seuratM_stroma, diseaseCond %in% c("CUP"))
+
+
+##rerun seurat
+seuratM_Tu_only <- NormalizeData (object = seuratM_Tu_only)
+seuratM_Tu_only <- FindVariableFeatures(object = seuratM_Tu_only)
+seuratM_Tu_only <- ScaleData(object = seuratM_Tu_only, verbose = TRUE)
+seuratM_Tu_only <- RunPCA(object=seuratM_Tu_only, npcs = 30, verbose = FALSE)
+seuratM_Tu_only <- RunTSNE(object=seuratM_Tu_only, reduction="pca", dims = 1:20)
+seuratM_Tu_only <- RunUMAP(object=seuratM_Tu_only, reduction="pca", dims = 1:20)
+seuratM_Tu_only <- FindNeighbors(object = seuratM_Tu_only, reduction = "pca", dims= 1:20)
+
+res <- c(0.25, 0.6, 0.8, 0.4)
+for (i in 1:length(res)) {
+  seuratM_Tu_only <- FindClusters(object = seuratM_Tu_only, resolution = res[i], random.seed = 1234)
+}
+
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$RNA_snn_res.0.25
+DimPlot(seuratM_Tu_only, reduction = "umap", pt.size = 0.1) 
+
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$colclusterName
+DimPlot(seuratM_Tu_only, reduction = "umap", pt.size = 0.1) 
+
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$patient
+DimPlot(seuratM_Tu_only, reduction = "umap", pt.size = 0.1, shuffle = TRUE) 
+
+
+seuratM_Tu_only$colclusterName <- factor(seuratM_Tu_only$colclusterName, levels=c("PI16_FRC","FRC1","FRC2", "PRC","PRC_Tu","CAF1","BEC1","BEC2","LEC"))
+
+Idents(seuratM_Tu_only) <-seuratM_Tu_only$RNA_snn_res.0.25
+
+genes <- data.frame(gene=rownames(seuratM_Tu_only)) %>% 
+  mutate(geneID=gsub("^.*\\.", "", gene))
+
+selGenes <- data.frame(geneID=rev(c( "COL1A2", "COL6A3", "PDGFRB", "DCN",  "FBN1", "C7", "CCL21","CCL19", "CXCL12", "PI16", "ACTA2", "ITGA7","RGS5", "NOTCH3", "MCAM","PDPN", "FAP","LRRC15","POSTN","PECAM1", "VWF", "EGFL7", "ITGA10", "PROX1"))) %>% left_join(., genes, by="geneID") %>% filter(gene != "ENSG00000232995.RGS5") 
+
+DotPlot(seuratM_Tu_only, features = selGenes, group.by= "RNA_snn_res.0.25") + RotatedAxis() + scale_color_viridis(option="F") + coord_flip()
+
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$RNA_snn_res.0.25
+DimPlot(seuratM_Tu_only, reduction = "umap", pt.size = 0.1) 
+
+
+##assign celltypes
+seuratM_Tu_only$colclusterName_Tu <- "Tu"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 == "0")] <- "Tu1"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 %in% c("1","5","7"))] <- "CAF"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 %in% c("2", "4"))] <- "PRC_Tu"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 == "3")] <- "Tu2"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 %in% c("6", "9"))] <- "Tu3"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 == "8")] <- "BEC"
+seuratM_Tu_only$colclusterName_Tu[which(seuratM_Tu_only$RNA_snn_res.0.25 == "10")] <- "LEC"
+
+table(seuratM_Tu_only$colclusterName_Tu)
+
+
+colclusterName_Tu <- c("#D53E4F", "#f4a582", "#FEE08B", "#003c30","#3288BD","#BEAED4", "#c7eae5")
+names(colclusterName_Tu) <- c("Tu1","BEC","CAF","PRC_Tu","Tu2","Tu3","LEC")
+
+
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$colclusterName_Tu
+DimPlot(seuratM_Tu_only, reduction = "umap", pt.size = 0.1, cols = colclusterName_Tu, label =TRUE) 
+
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$patient
+DimPlot(seuratM_Tu_only, reduction = "umap", pt.size = 0.1, shuffle = TRUE) 
+
+
+
+
+
+
+```
+
+
+
+
+```{r rel abundance, fig.height= 8, fig.width= 8}
+
+##cluster marker
+Idents(seuratM_Tu_only) <- seuratM_Tu_only$colclusterName_Tu
+markerGenes_Tu <- FindAllMarkers(seuratM_Tu_only, only.pos=T) %>% 
+  dplyr::filter(p_val_adj < 0.01)
+#save table
+write.table(markerGenes, 
+            file= "/R/CUP/analysis/markerGenes_Tu",
+            sep="\t",
+            quote=F,
+            row.names=F,
+            col.names=T)
+
+
+```
+
+
+
+```{r}
+
+library(CellChat)
+library(patchwork)
+
+sce_Tu <- as.SingleCellExperiment(seuratM_Tu_only) 
+rownames(sce_Tu) <- gsub("^.*\\.", "", rownames(sce_Tu))
+
+cellchat <- createCellChat(object = sce_Tu, group.by = "colclusterName_Tu")
+
+CellChatDB <- CellChatDB.human
+showDatabaseCategory(CellChatDB)
+dplyr::glimpse(CellChatDB$interaction)
+
+CellChatDB.use <- CellChatDB
+cellchat@DB <- CellChatDB.use
+
+cellchat <- subsetData(cellchat) 
+
+future::plan("multisession", workers = 4)
+options(future.globals.maxSize = 3 * 1024^3)  # 3 GiB
+
+cellchat <- identifyOverExpressedGenes(cellchat)
+cellchat <- identifyOverExpressedInteractions(cellchat)
+
+cellchat <- computeCommunProb(cellchat, type = "truncatedMean", trim = 0.1)
+
+
+cellchat <- computeCommunProbPathway(cellchat)
+cellchat <- aggregateNet(cellchat)
+future.seed=TRUE
+cellchat <- netAnalysis_computeCentrality(cellchat, slot.name = "netP") 
+saveRDS(cellchat, file = "/R/CUP/analysis/cellchat_allext.rds")
+
+
+
+
+
+
+```
+
+
+```{r}
+
+
+
+names(colclusterName_Tu) <- levels(cellchat@idents)
+gg1 <- netAnalysis_signalingRole_scatter(cellchat, color.use = colclusterName_Tu)
+gg1
+
+
+
+```
+
+
+
+```{r}
+
+groupSize <- as.numeric(table(cellchat@idents))
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_circle(cellchat@net$count, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Number of interactions", targets.use = 1:7, sources.use = 1:2, color.use = colclusterName_Tu)
+netVisual_circle(cellchat@net$weight, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Interaction weights/strength", targets.use = 1:7, sources.use = 1:2, color.use = colclusterName_Tu)
+
+
+
+par(mfrow = c(1,2), xpd = TRUE)  # Reset plot layout
+
+for (i in 1:7) {
+  netVisual_circle(cellchat@net$count,
+                   vertex.weight = groupSize,
+                   weight.scale = TRUE,
+                   label.edge = FALSE,
+                   title.name = paste("Source cluster:count", i),
+                   targets.use = 1:7,         # You can keep targets fixed
+                   sources.use = i,           # Varying sources
+                   color.use = colclusterName_Tu)
+  
+  netVisual_circle(cellchat@net$weight,
+                   vertex.weight = groupSize,
+                   weight.scale = TRUE,
+                   label.edge = FALSE,
+                   title.name = paste("Source cluster:weight", i),
+                   targets.use = 1:7,         # You can keep targets fixed
+                   sources.use = i,           # Varying sources
+                   color.use = colclusterName_Tu)
+}
+
+
+```
+
+
+```{r, fig.height= 8, fig.width= 8}
+
+
+write.table(data.frame(Pathways = cellchat@netP$pathways),
+            file = "identified_pathways.txt",
+            row.names = FALSE,
+            col.names = TRUE,
+            quote = FALSE,
+            sep = "\t")
+
+
+
+pathways.show <- c("TGFb", "PDGF", "TENASCIN")
+
+
+netAnalysis_signalingRole_network(cellchat, signaling = pathways.show, width = 8, height = 2.5, font.size = 10, color.heatmap = "Blues", color.use = colclusterName_Tu)
+
+
+netAnalysis_contribution(cellchat, signaling = pathways.show)
+
+netVisual_bubble(cellchat, sources.use = c(1:7), targets.use = c(1:7), remove.isolate = FALSE, pathways.show)
+
+netVisual_chord_gene(cellchat, signaling = pathways.show, 
+                     sources.use = c(1:7), 
+                     targets.use = c(1:7), 
+                     lab.cex = 0.6)
+
+
+
+mat <- cellchat@net$weight
+par(mfrow = c(3,3), xpd=TRUE)
+for (i in 1:nrow(mat)) {
+  mat2 <- matrix(0, nrow = nrow(mat), ncol = ncol(mat), dimnames = dimnames(mat))
+  mat2[i, ] <- mat[i, ]
+  netVisual_circle(mat2, vertex.weight = groupSize, weight.scale = T, edge.weight.max = max(mat), title.name = rownames(mat)[i])
+}
+
+
+
+
+```
+
+
+```{r}
+plotGeneExpression(cellchat, signaling = "TGFb")
+
+pathways.show.all <- cellchat@netP$pathways
+
+# Compute the network centrality scores
+cellchat <- netAnalysis_computeCentrality(cellchat, slot.name = "netP") # the slot 'netP' means the inferred intercellular communication network of signaling pathways
+# Visualize the computed centrality scores using heatmap, allowing ready identification of major signaling roles of cell groups
+netAnalysis_signalingRole_network(cellchat, signaling = pathways.show.all, width = 8, height = 2.5, font.size = 10)
+
+
+
+
+
+```
+
+
+
+```{r}
+pathways.show <- c("TGFb")
+
+par(mfrow=c(1,1))
+netVisual_aggregate(cellchat, signaling = pathways.show, layout = "chord")
+
+# Heatmap
+par(mfrow=c(1,1))
+netVisual_heatmap(cellchat, signaling = pathways.show, color.heatmap = "Reds")
+#> Do heatmap based on a single object
+
+
+# Heatmap with lapply function to show all pathways
+lapply(pathways.show.all, function(pw) {
+  netVisual_heatmap(cellchat, signaling = pw, color.heatmap = "Reds", title.name = pw)
+})
+
+
+
+
+
+```
+
+
+```{r}
+
+pairLR.all <- extractEnrichedLR(cellchat, signaling = pathways.show.all, geneLR.return = FALSE)
+top100_LR <- pairLR.all[1:100, , drop = FALSE] # show top 100 ligand-receptor pairs
+top50_LR <- pairLR.all[1:50, , drop = FALSE] # show top 100 ligand-receptor pairs
+
+
+netVisual_bubble(cellchat, sources.use = 2, targets.use = c(1:7),pairLR.use = top100_LR, remove.isolate = FALSE)
+
+netVisual_bubble(cellchat, sources.use = c("CAF","PRC_Tu"), pairLR.use = top50_LR, remove.isolate = FALSE)
+
+
+```
+
+
+```{r, fig.height= 6, fig.width= 6}
+
+netVisual_chord_gene(cellchat, sources.use = 2, targets.use = c(5:7),pairLR.use = top100_LR, lab.cex = 0.5,legend.pos.y = 10)
+
+
+
+
+```
+
+
+```{r, fig.height= 6}
+
+# Signaling role analysis on the aggregated cell-cell communication network from all signaling pathways
+gg1 <- netAnalysis_signalingRole_scatter(cellchat)
+gg1
+
+
+ht1 <- netAnalysis_signalingRole_heatmap(cellchat, pattern = "outgoing", height = 25)
+ht2 <- netAnalysis_signalingRole_heatmap(cellchat, pattern = "incoming")
+ht1 
+
+netAnalysis_dot(cellchat, pattern = "incoming")
+
+```
+
+
+```{r, fig.width= 8}
+library(NMF)
+library(ggalluvial)
+
+nPatterns = 6
+cellchat <- identifyCommunicationPatterns(cellchat, pattern = "outgoing", k = nPatterns)
+netAnalysis_dot(cellchat, pattern = "outgoing", font.size = 6)
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
