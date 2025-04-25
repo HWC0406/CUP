@@ -3,12 +3,12 @@ title: "CUP Umaps"
 author: "HW.Cheng"
 date: "2025-04-25"
 output:
-  pdf_document:
-    toc: true
   html_document:
     keep_md: true
     toc: true
     self_contained: true
+  pdf_document:
+    toc: true
 editor_options:
   chunk_output_type: inline
 ---
@@ -60,7 +60,7 @@ library(RColorBrewer)
 
 
 ## load files and merge
-```{r load files, eval=FALSE, include=TRUE}
+```{r load files, include=TRUE}
 ### load files and merge
 basedir <- "/R/CUP/data/CD45pos/"
 fileNamList <- list.files(path = basedir)
@@ -85,7 +85,7 @@ seuratM <- JoinLayers(seuratM)
 ```
 
 ## add metadata
-```{r add metadata, eval=FALSE, include=TRUE}
+```{r add metadata, include=TRUE}
 ### add any type of metadata
 
 CUP_pat_01 <- c("373291_02-2_20241211_Hu_CUP_01_CD45pos")
@@ -110,41 +110,12 @@ table(seuratM$orig.ident)
 ```
 
 
-## QC check
-```{r QC check_2}
-### QC merged
-# Extract meta.data from the Seurat object
-meta.data_fil <- seuratM@meta.data
-# Create the density plot
-ptotalpat_fil <- ggplot(data = meta.data_fil, aes(x = total, color = patient, fill = patient)) +
-  geom_density(alpha = 0.2) +
-  #scale_fill_manual(values = colpat) +
-  #scale_color_manual(values = colpat) +
-  theme_classic() +
-  scale_x_log10() +
-  ylab("density") +
-  geom_vline(xintercept = 100)
-
-
-pdetectedpat_fil <- ggplot(data = meta.data_fil, aes(x = detected, color = patient, fill = patient)) +
-  geom_density(alpha = 0.2) +
-  #scale_fill_manual(values = colpat) +
-  #scale_color_manual(values = colpat) +
-  theme_classic() +
-  scale_x_log10() +
-  ylab("density") +
-  geom_vline(xintercept = 100)
-
-# Return the plots as a list
-list(ptotalpat_fil, pdetectedpat_fil)
-
-```
 
 
 
 
 ## rerun seurat
-```{r rerun seurat, eval=FALSE, include=TRUE}
+```{r rerun seurat,  include=TRUE}
 #rerun seurat
 seuratM <- NormalizeData (object = seuratM)
 seuratM <- FindVariableFeatures(object = seuratM, selection.method = "vst", nfeatures = 3000)
@@ -160,10 +131,7 @@ for (i in 1:length(res)) {
 }
 ```
 
-```{r save merged seurat object, eval=FALSE, include=TRUE}
-### save seurat object
-saveRDS(seuratM, file="/R/CUP/data/CD45pos_merged_seurat.rds")
-```
+
 
 
 ## plot cell numbers
@@ -197,7 +165,7 @@ DimPlot(seuratM, reduction = "umap", pt.size = 0.1) + theme(legend.position = "n
 
 
 ## calculate cluster marker genes
-```{r marker genes_total, include=TRUE, eval=FALSE}
+```{r marker genes_total, include=TRUE}
 ##cluster marker
 Idents(seuratM) <- seuratM$RNA_snn_res.0.25
 markerGenes <- FindAllMarkers(seuratM, only.pos=T) %>% 
@@ -275,12 +243,31 @@ for(con in unique(seuratM$patient)){
 
 dat_all <- do.call("rbind", datList)
 
+
+# Define the order you want
+patient_order <- c("CUP_01", "CUP_03", "CUP_04", "CUP_05")  # customize as needed
+dat_all$patient <- factor(dat_all$patient, levels = patient_order)
+
+
 ## plot abundance - separated by patients
 ggbarplot(dat_all, x= "patient", y= "percent", fill = "Var1", palette = colclusterName,  legend = "right", legend.titel = "cluster", ylab = "frequency")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+## plot abundance - separated by clusters
+ggbarplot(dat_all,
+          x = "patient",
+          y = "percent",
+          fill = "Var1",  # optional: color bars by cluster
+          palette = colclusterName,
+          ylab = "Cluster Frequency (%)",
+          xlab = "Patient",
+          legend = "none") +  # or keep legend if you want
+  facet_wrap(~Var1, scales = "free_y") +  # one panel per cluster
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
 
 ```
+
 
 
 
@@ -358,8 +345,7 @@ for (p in umap_plots) print(p)
 
 
 
-
-```{r save merged seurat object, eval=FALSE, include=TRUE}
+```{r save seurat object, eval=FALSE, include=TRUE}
 ### save seurat object
 saveRDS(seuratM, file="/R/CUP/data/CD45pos_seurat.rds")
 ```
@@ -367,15 +353,8 @@ saveRDS(seuratM, file="/R/CUP/data/CD45pos_seurat.rds")
 
 
 
-
-
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+## session info
+```{r date and session info}
+date()
+sessionInfo()
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
