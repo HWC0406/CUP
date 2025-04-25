@@ -19,6 +19,8 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE, dev = c("png", "pdf"))
 seed <- 1234
 ```
 
+
+
 ## load packages
 ```{r load packages, warning=FALSE, include=FALSE}
 library(ExploreSCdataSeurat3)
