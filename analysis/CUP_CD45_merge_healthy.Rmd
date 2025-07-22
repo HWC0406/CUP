@@ -1,0 +1,389 @@
+---
+title: "CUP Umaps"
+author: "HW.Cheng"
+date: "2025-04-25"
+output:
+  html_document:
+    keep_md: true
+    toc: true
+    self_contained: true
+  pdf_document:
+    toc: true
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(width = 100)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, dev = c("png", "pdf"))
+seed <- 1234
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+## load packages
+```{r load packages, warning=FALSE, include=FALSE}
+library(ExploreSCdataSeurat3)
+library(runSeurat3)
+library(Seurat)
+library(ggpubr)
+library(pheatmap)
+library(SingleCellExperiment)
+library(dplyr)
+library(tidyverse)
+library(viridis)
+library(muscat)
+library(circlize)
+library(destiny)
+library(scater)
+library(metap)
+library(multtest)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(enrichplot)
+library(DOSE)
+library(grid)
+library(gridExtra)
+library(ggupset)
+library(VennDiagram)
+library(NCmisc)
+library(RColorBrewer)
+```
+
+
+
+
+## load files and merge
+```{r load files, eval=FALSE, include=FALSE}
+### load files and merge
+basedir <- "/R/CUP/data/CD45pos/"
+fileNamList <- list.files(path = basedir)
+
+for(i in 1:length(fileNamList)){
+  seuratS <- readRDS(paste0(basedir, fileNamList[i]))
+  if(exists("seuratM")){
+    seuratM <- merge(x = seuratM, y = seuratS)
+  }else{
+    seuratM <- seuratS
+  }
+}
+
+remove(seuratS)
+table(seuratM$dataset)
+table(seuratM$orig.ident)
+
+##join layers
+seuratM <- JoinLayers(seuratM)
+
+
+```
+
+```{r load merged file}
+##load merged file 
+fileNam <- "/R/CUP/data/CD45pos_seurat_merge.rds"
+seuratM <- readRDS(fileNam)
+table(seuratM$dataset)
+table(seuratM$RNA_snn_res.0.25)
+table(seuratM$orig.ident)
+
+```
+
+
+
+
+## add metadata
+```{r add metadata, include=TRUE}
+### add any type of metadata
+
+CUP_pat_01 <- c("373291_02-2_20241211_Hu_CUP_01_CD45pos")
+CUP_pat_04 <- c("373291_04-4_20241211_Hu_CUP_04_CD45pos")
+CUP_pat_05 <- c("373291_06-6_20241211_Hu_CUP_05_CD45pos")
+CUP_pat_03 <- c("373291_08-8_20241211_Hu_CUP_03_CD45pos")
+hLN_04 <- c("o27533_1_02-2_20220201_Hu_LN_CD3_v3","o27533_1_03-3_20220201_Hu_LN_CD19_v3","o27533_1_04-4_20220201_Hu_LN_Myeloid_v3")
+hLN_05 <- c("o27533_1_06-6_20220202_Hu_LN_CD3_v3","o27533_1_07-7_20220202_Hu_LN_CD19_v3","o27533_1_08-8_20220202_Hu_LN_Myeloid_v3")
+
+seuratM$patient <- "pat_nr"
+seuratM$patient[which(seuratM$dataset %in% CUP_pat_01)] <- "CUP_01"
+seuratM$patient[which(seuratM$dataset %in% CUP_pat_04)] <- "CUP_04"
+seuratM$patient[which(seuratM$dataset %in% CUP_pat_05)] <- "CUP_05"
+seuratM$patient[which(seuratM$dataset %in% CUP_pat_03)] <- "CUP_03"
+seuratM$patient[which(seuratM$dataset %in% hLN_04)] <- "hLN_04"
+seuratM$patient[which(seuratM$dataset %in% hLN_05)] <- "hLN_05"
+
+table(seuratM$patient)
+table(seuratM$orig.ident)
+
+
+
+#### diseaseCond
+seuratM$diseaseCond <- "diseaseCond"
+seuratM$diseaseCond[grepl("CUP", seuratM$dataset)] <- "CUP"
+seuratM$diseaseCond[grepl("LN", seuratM$dataset)] <- "healthy"
+table(seuratM$diseaseCond)
+
+###order
+orddiseaseCond <- c("healthy", "CUP")
+seuratM$diseaseCond <- factor(seuratM$diseaseCond, levels=c("healthy", "CUP"))
+Idents(seuratM) <- seuratM$diseaseCond
+table(seuratM$diseaseCond)
+
+
+
+
+```
+
+
+
+
+
+
+## rerun seurat
+```{r rerun seurat,eval=FALSE,  include=TRUE}
+#rerun seurat
+seuratM <- NormalizeData (object = seuratM)
+seuratM <- FindVariableFeatures(object = seuratM, selection.method = "vst", nfeatures = 3000)
+seuratM <- ScaleData(object = seuratM, verbose = TRUE)
+seuratM <- RunPCA(object=seuratM, npcs = 20, verbose = FALSE)
+seuratM <- RunTSNE(object=seuratM, reduction="pca", dims = 1:20, check_duplicates = FALSE)
+seuratM <- RunUMAP(object=seuratM, reduction="pca", dims = 1:20)
+seuratM <- FindNeighbors(object = seuratM, reduction = "pca", dims= 1:20)
+
+res <- c(0.25, 0.6, 0.8, 0.4, 0.1)
+for (i in 1:length(res)) {
+  seuratM <- FindClusters(object = seuratM, resolution = res[i], random.seed = 1234)
+}
+```
+
+
+
+
+## plot cell numbers
+```{r cellnumber circle}
+cell_count <- data.frame(table(seuratM$patient))
+colnames(cell_count) <- c("patient", "Freq")
+hsize <- 1.5
+
+ggplot(cell_count, aes(x = hsize, y = Freq, fill = patient)) +
+  #scale_fill_manual(values = colpat2) +
+  geom_col(color = "white") +
+  coord_polar(theta = "y") +
+  xlim(c(0.2, hsize + 0.5)) +
+  theme_void() +
+  ggtitle("cell number") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15)) +
+  geom_text(aes(label = Freq), position = position_stack(vjust = 0.5))
+```
+
+
+## plot umaps
+```{r umap}
+Idents(seuratM) <- seuratM$RNA_snn_res.0.1
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1,label = TRUE) 
+
+
+Idents(seuratM) <- seuratM$patient
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, shuffle = TRUE) 
+
+Idents(seuratM) <- seuratM$diseaseCond
+coldiseaseCond <- c("#202547","lightgrey")
+names(coldiseaseCond) <- c("healthy", "CUP")
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, cols = coldiseaseCond, order = "healthy") 
+
+
+
+```
+
+
+## calculate cluster marker genes
+```{r marker genes_total,eval=FALSE,  include=TRUE}
+##cluster marker
+Idents(seuratM) <- seuratM$RNA_snn_res.0.1
+markerGenes <- FindAllMarkers(seuratM, only.pos=T) %>% 
+  dplyr::filter(p_val_adj < 0.01)
+#save table
+write.table(markerGenes, 
+            file= "/R/CUP/analysis/markerGenes_CD45pos",
+            sep="\t",
+            quote=F,
+            row.names=F,
+            col.names=T)
+```
+
+## Assign cell types to clusters
+```{r Assign cell types to clusters}
+
+colclusterName <- c("#67001f", "#D53E4F", "#f4a582", "#FEE08B","#66C2A5", "#3288BD","#BEAED4", "#c7eae5","#355C7D","#202547","#B45B5C")
+names(colclusterName) <- c("T_cell_1","T_cell_2","B_cell_1","B_cell_2","B_cell_3","NK", "Mph1","Mph2","proliferating","pDC_1","pDC_2")
+
+
+##assign celltypes
+seuratM$colclusterName <- "celltype"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "0")] <- "T_cell_1"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "1")] <- "T_cell_2"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "2")] <- "B_cell_1"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "3")] <- "B_cell_2"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "4")] <- "B_cell_3"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "5")] <- "NK"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "6")] <- "pDC_1"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "7")] <- "Mph1"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "8")] <- "pDC_2"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "9")] <- "Mph2"
+seuratM$colclusterName[which(seuratM$RNA_snn_res.0.1 == "10")] <- "proliferating"
+
+
+
+
+# Define your desired order
+celltype_order <- c("T_cell_1","T_cell_2","B_cell_1","B_cell_2","B_cell_3","NK", "Mph1","Mph2","proliferating","pDC_1","pDC_2")
+
+seuratM$colclusterName <- factor(seuratM$colclusterName, levels = celltype_order)
+
+
+
+# Define the order you want
+patient_order <- c("CUP_01", "CUP_03", "CUP_04", "CUP_05", "hLN_04","hLN_05")  # customize as needed
+seuratM$patient <- factor(seuratM$patient, levels = patient_order)
+
+Idents(seuratM) <- seuratM$colclusterName
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, cols = colclusterName, label =FALSE) 
+
+
+Idents(seuratM) <- seuratM$colclusterName
+DimPlot(seuratM, reduction = "umap", pt.size = 0.1, cols = colclusterName, label =FALSE, split.by = "patient") 
+```
+
+
+### Gene expression in different cell types{.tabset}
+#### T cell marker
+```{r T cell marker}
+
+## T cell marker
+FeaturePlot(seuratM, features = "ENSG00000198851.CD3E", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000167286.CD3D", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000010610.CD4", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000153563.CD8A", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+
+
+```
+
+#### B cell marker
+```{r B cell marker}
+
+## B cell marker
+FeaturePlot(seuratM, features = "ENSG00000105369.CD79A", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000007312.CD79B", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000004468.CD38", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000211898.IGHD", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000211899.IGHM", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+
+```
+
+
+#### Myeloid cell marker
+```{r Myeloid cell marker}
+## NK cell marker
+FeaturePlot(seuratM, features = "ENSG00000134539.KLRD1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000111796.KLRB1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000134545.KLRC1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000211829.TRDC", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+
+## Macrophage marker
+FeaturePlot(seuratM, features = "ENSG00000090382.LYZ", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000085265.FCN1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000163220.S100A9", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000182578.CSF1R", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000170458.CD14", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+
+## pDC
+FeaturePlot(seuratM, features = "ENSG00000185507.IRF7", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000239961.LILRA4", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000186818.LILRB4", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000198178.CLEC4C", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+
+```
+
+#### Inhibitory molecule
+```{r Inhibitory molecule}
+## T cell - inhibitory molecule
+FeaturePlot(seuratM, features = "ENSG00000163600.ICOS", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000163599.CTLA4", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000188389.PDCD1", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000181847.TIGIT", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+FeaturePlot(seuratM, features = "ENSG00000089692.LAG3", pt.size = 0.5, cols = c("lightgrey", "#BE3144"))
+
+
+```
+
+
+
+
+## Plot gene signatures onto UMAP
+```{r cell type gene signatures}
+
+##convert seurat object to sce object
+sce <- as.SingleCellExperiment(seuratM)
+
+signatures <- list(
+  T_cell = c("CD3E","CD3D","CD4","CD8A"),
+  B_cell = c("CD79A","CD79B","IGHD","IGHM","JCHAIN"),
+  Myeloid_cell = c("KLRD1","KLRB1","KLRC1","TRDC","LYZ","FCN1","S100A9","CSF1R","CD14" ,"IRF7","LILRA4","LILRB4"),
+  Inhibitory_function= c("PDCD1","TIGIT","CTLA4","LAG3","ICOS")
+    )
+
+
+# Extract gene symbols
+genes <- data.frame(geneID = rownames(sce)) %>%
+  mutate(gene = gsub(".*\\.", "", geneID))
+
+# Function to compute signature and return UMAP plot
+plot_signature_umap <- function(sig_name, sig_genes) {
+  signGenes <- genes %>% filter(gene %in% sig_genes)
+  sceSub <- sce[rownames(sce) %in% signGenes$geneID, ]
+  
+  cntMat <- rowSums(t(as.matrix(sceSub@assays@data$logcounts))) / nrow(signGenes)
+  sceSub$sign <- cntMat
+  sceSub$sign2 <- pmin(sceSub$sign, 2.5)  # cap at 2.5
+  
+  plotUMAP(sceSub, colour_by = "sign2", point_size = 1) +
+    scale_color_viridis_c() +  # or another color scale
+    ggtitle(paste0(sig_name, " signature")) +
+    theme_minimal() +
+    theme(legend.position = "right")
+}
+
+# Generate all plots
+umap_plots <- lapply(names(signatures), function(name) {
+  plot_signature_umap(name, signatures[[name]])
+})
+
+# Optionally: show all plots (in interactive session or PDF)
+# Print them one by one
+for (p in umap_plots) print(p)
+
+
+
+
+```
+
+
+
+
+```{r save seurat object, eval=FALSE, include=TRUE}
+### save seurat object
+saveRDS(seuratM, file="/R/CUP/data/CD45pos_seurat_merge.rds")
+```
+
+
+
+
+## session info
+```{r date and session info}
+date()
+sessionInfo()
+```
